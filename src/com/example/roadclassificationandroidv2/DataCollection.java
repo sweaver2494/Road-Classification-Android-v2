@@ -248,13 +248,13 @@ public class DataCollection implements SensorEventListener {
 
 				sensorbr.close();
 				audiobr.close();
-				(new File(testFilePath)).isFile();
 				(new File(sensorFilePath)).delete();
 				(new File(audioFilePath)).delete();
 
 				isStarted = false;
 
 				classification = predictClassification();
+				(new File(testFilePath)).delete();
 			} catch (IOException e) {
 				System.err.println("Cannot write data file. " + e.toString());
 			} catch (InterruptedException e) {
