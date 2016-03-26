@@ -2,7 +2,7 @@
  *
  * @author Scott Weaver
  */
-package com.example.roadclassificationandroid;
+package com.example.roadclassificationandroidv2;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -58,8 +58,7 @@ public class DataCollection implements SensorEventListener {
 	private String classification = "";
 	private String testDataDir = "";
 	private String sensorFilePath = "";
-	private String testDataPath = "";
-	private String featureDataPath = "";
+	private String testFilePath = "";
 	
 	private ArrayList<double[]> trainingData;
 	private ArrayList<String> trainingClassification;
@@ -159,19 +158,17 @@ public class DataCollection implements SensorEventListener {
 
 			sensorFilePath = (testDataDir + "test_sensor.csv");
 			audioFilePath = (testDataDir + "test_audio.csv");
-			testDataPath = (testDataDir + "test.csv");
-			featureDataPath = (testDataDir + "test_features.csv");
+			testFilePath = (testDataDir + "test.csv");
 
 			System.out.println("Sensor Path " + sensorFilePath);
 			System.out.println("Audio Path " + audioFilePath);
-			System.out.println("Test Data Path " + testDataPath);
-			System.out.println("Test Feature Path " + featureDataPath);
+			System.out.println("Test Data Path " + testFilePath);
 
 			if (success) {
 				try {
 					sensorbw = new BufferedWriter(new FileWriter(sensorFilePath, false));
 					audiobw = new BufferedWriter(new FileWriter(audioFilePath, false));
-					testDataBw = new BufferedWriter(new FileWriter(testDataPath, false));
+					testDataBw = new BufferedWriter(new FileWriter(testFilePath, false));
 				} catch (IOException e) {
 					System.err.println("Could not open data file. " + e.toString());
 					success = false;
@@ -230,9 +227,6 @@ public class DataCollection implements SensorEventListener {
 				
 				BufferedReader sensorbr = new BufferedReader(new InputStreamReader(new FileInputStream(sensorFilePath)));
 				BufferedReader audiobr = new BufferedReader(new InputStreamReader(new FileInputStream(audioFilePath)));
-				testDataBw.write("unkown");
-				testDataBw.newLine();
-				testDataBw.flush();
 
 				String line = sensorbr.readLine();
 				while (line != null) {
@@ -254,14 +248,13 @@ public class DataCollection implements SensorEventListener {
 
 				sensorbr.close();
 				audiobr.close();
-				if ((new File(testDataPath)).isFile()) {
-					(new File(sensorFilePath)).delete();
-					(new File(audioFilePath)).delete();
-				}
+				(new File(testFilePath)).isFile();
+				(new File(sensorFilePath)).delete();
+				(new File(audioFilePath)).delete();
 
 				isStarted = false;
 
-				predictClassification();
+				classification = predictClassification();
 			} catch (IOException e) {
 				System.err.println("Cannot write data file. " + e.toString());
 			} catch (InterruptedException e) {
@@ -291,31 +284,28 @@ public class DataCollection implements SensorEventListener {
 	}
 	
 	private String predictClassification() {
+		int numTrainingHeaders = trainingColumnHeaders.size();
 		
-		ArrayList<double[]> testData = new ArrayList<double[]>(1);
-		ArrayList<String> testClassification = new ArrayList<String>();
+		double[] testData = new double[numTrainingHeaders];
 		ArrayList<String> testColumnHeaders = new ArrayList<String>();
 		
-		//Convert raw data to feature file
-		FileUtilities.createTestData(testDataPath, featureDataPath);
-		//Extract features from feature file
-		FileUtilities.readFeatureFile(featureDataPath, testData, testClassification, testColumnHeaders);
+		//Convert raw data to a singular test feature data
+		FileUtilities.createTestData(testFilePath, testData, testColumnHeaders);
 		
-		//double[] orderedTestDataArr = new double[testData.get(0).length];
-		ArrayList<double[]> orderedTestData = new ArrayList<double[]>(1);
+		int numTestHeaders = testColumnHeaders.size();
+		double[] orderedTestData = new double[numTrainingHeaders];
 		
-		for (String header : trainingColumnHeaders) {
-			for (int i = 0; i < testColumnHeaders.size(); i++) {
-				if (testColumnHeaders.get(i).equals(header)) {
-					orderedTestData.add(testData.get(i));
+		for (int i = 0; i < numTrainingHeaders; i++) {
+			String trainingColumnHeader = trainingColumnHeaders.get(i);
+			for (int j = 0; j < numTestHeaders; j++) {
+				if (testColumnHeaders.get(j).equals(trainingColumnHeader)) {
+					orderedTestData[i] = testData[j];
 				}
 			}
 		}
 		
-		ArrayList<DistObj> distObjects = KnnUtilities.performKNN(trainingData, orderedTestData.get(0));
-		classification = KnnUtilities.getPredictedClassification(distObjects, trainingClassification, k_value);
-		
-		return classification;
+		ArrayList<DistObj> distObjects = KnnUtilities.performKNN(trainingData, orderedTestData);
+		return KnnUtilities.getPredictedClassification(distObjects, trainingClassification, k_value);
 	}
 
 	public void onAccuracyChanged(Sensor paramSensor, int paramInt) {

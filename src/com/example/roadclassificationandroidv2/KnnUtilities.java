@@ -1,4 +1,4 @@
-package com.example.roadclassificationandroid;
+package com.example.roadclassificationandroidv2;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -70,8 +70,6 @@ public class KnnUtilities {
     			classification = key;
     		}
 		}
-		
-		System.out.println(classification + ":\t\t" + max + "/" + k);
 		
 		return classification;
 		

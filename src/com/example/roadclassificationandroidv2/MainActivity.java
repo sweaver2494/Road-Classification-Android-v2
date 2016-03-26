@@ -2,10 +2,12 @@
  *
  * @author Scott Weaver
  */
-package com.example.roadclassificationandroid;
+package com.example.roadclassificationandroidv2;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+
+import com.example.roadclassificationandroidv2.R;
 
 import android.app.Activity;
 import android.os.Bundle;
@@ -26,7 +28,7 @@ public class MainActivity extends Activity {
 	String condition = "";
 	String trainingFileName = "";
 	boolean stopped = false;
-	long timeInterval = (long) 0.5;
+	long timeInterval = (long) 500;//1/2 second
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -37,8 +39,8 @@ public class MainActivity extends Activity {
 		
 		String trainingDataDirPath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).getAbsolutePath() + "/Classification/";
 		final HashMap<String, String> fileNameMap = new HashMap<String, String>();
-		fileNameMap.put("paved_vs_unpaved", trainingDataDirPath + "training_data_30.csv");
-		fileNameMap.put("30mph_vs_60mph", trainingDataDirPath + "training_data_paved.csv");
+		fileNameMap.put("paved_vs_unpaved", trainingDataDirPath + "feature_data_30.csv");
+		fileNameMap.put("30mph_vs_60mph", trainingDataDirPath + "feature_data_paved.csv");
 
 		//CONDITION DROP DOWN
 		ArrayList<String> conditions = new ArrayList<String>();
@@ -62,7 +64,6 @@ public class MainActivity extends Activity {
 		//STOP BUTTON
 		((Button) findViewById(R.id.stopButton)).setOnClickListener(new View.OnClickListener() {
 			public void onClick(View v) {
-				collection.StopCollection();
 				stopped = true;
 				((Chronometer) findViewById(R.id.chronometer)).stop();
 			}
@@ -79,33 +80,40 @@ public class MainActivity extends Activity {
 				FileUtilities.readFeatureFile(trainingFileName, trainingData, trainingClassification, trainingColumnHeaders);
 				collection.setTrainingData(trainingData, trainingClassification, trainingColumnHeaders);
 				
-				long startTime = SystemClock.elapsedRealtime();
+				((Chronometer) findViewById(R.id.chronometer)).setBase(SystemClock.elapsedRealtime());
+				((Chronometer) findViewById(R.id.chronometer)).start();
 				
-				if (collection.StartCollection()) {
-					((Chronometer) findViewById(R.id.chronometer)).setBase(startTime);
-					((Chronometer) findViewById(R.id.chronometer)).start();
-				}
-				
-				while (!stopped) {
-					if (SystemClock.elapsedRealtime() > (startTime + timeInterval)) {
-						if (!collection.StopCollection()) {
-							stopped = true;
-						}
-						
-						String predictedClassification = collection.getClassification();
-						System.out.println("Predicted Classification: " + predictedClassification);
-						((EditText) findViewById(R.id.classificationText)).setText(predictedClassification);
-						
-						startTime = SystemClock.elapsedRealtime();
-						if (!stopped) {
-							if (!collection.StartCollection()) {
-								stopped = true;
-							}
-						}
+				Thread dataThread = new Thread(new Runnable() {
+					public void run() {
+						collectData(collection);
 					}
-				}
+				}, "Data Collection Thread");
+				dataThread.start();
 			}
 		});
+	}
+	
+	public void collectData(final DataCollection collection) {
+		
+		long startTime = SystemClock.elapsedRealtime();
+		
+		while (!stopped) {
+			collection.StartCollection();
+			
+			if (SystemClock.elapsedRealtime() > (startTime + timeInterval)) {
+				collection.StopCollection();
+				
+		        runOnUiThread(new Runnable() { 
+		            public  void  run() { 
+						String predictedClassification = collection.getClassification();
+						System.out.println("Predicted Classification: " + predictedClassification);
+		            	((EditText) findViewById(R.id.classificationText)).setText(predictedClassification);
+		            } 
+		        }); 
+				
+				startTime = SystemClock.elapsedRealtime();
+			}
+		}
 	}
 
 	@Override
